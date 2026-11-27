@@ -15,6 +15,7 @@ import 'package:path_to_regexp/path_to_regexp.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
 import 'package:saber/components/canvas/pencil_shader.dart';
+import 'package:saber/components/home/folder_lock_lifecycle.dart';
 import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/home/note_unlock_gate.dart';
 import 'package:saber/components/theming/dynamic_material_app.dart';
@@ -355,7 +356,9 @@ class _AppState extends State<App> {
   Widget build(BuildContext context) {
     return FolderLockScope(
       service: _folderLockService,
-      child: DynamicMaterialApp(title: 'Saber', router: App._router),
+      child: FolderLockLifecycle(
+        child: DynamicMaterialApp(title: 'Saber', router: App._router),
+      ),
     );
   }
 
