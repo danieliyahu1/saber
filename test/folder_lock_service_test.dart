@@ -373,6 +373,24 @@ void main() {
 
       expect(notifications, 0);
     });
+
+    test('a folder moved under a lock is decided by its new parent', () async {
+      await service.lock('/open', 'openpw');
+      await service.lock('/locked', 'secret');
+      await service.unlock('/open', 'openpw');
+      expect(await service.isOpen('/open/child'), isTrue);
+
+      service.folderMoved(from: '/open/child', to: '/locked/child');
+
+      expect(
+        await service.isOpen('/locked/child'),
+        isFalse,
+        reason: 'the destination folder is locked, so it is the nearest lock',
+      );
+
+      await service.unlock('/locked', 'secret');
+      expect(await service.isOpen('/locked/child'), isTrue);
+    });
   });
 
   group('FolderLockService.remove', () {

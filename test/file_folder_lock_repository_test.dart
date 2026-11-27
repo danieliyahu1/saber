@@ -7,8 +7,10 @@ import 'package:saber/data/flavor_config.dart';
 import 'package:saber/data/folder_lock/file_folder_lock_repository.dart';
 import 'package:saber/data/folder_lock/folder_lock.dart';
 import 'package:saber/data/folder_lock/folder_lock_repository.dart';
+import 'package:saber/data/folder_lock/folder_lock_service.dart';
 import 'package:saber/data/prefs.dart';
 
+import 'utils/folder_lock_fakes.dart';
 import 'utils/test_mock_channel_handlers.dart';
 
 void main() {
@@ -140,6 +142,82 @@ void main() {
       expect(
         await repository.write(folder, lock),
         isA<FolderLockWriteFailed>(),
+      );
+    });
+  });
+
+  group('The lock follows a rename (FR-25, SABER-30)', () {
+    const original = '/folder_lock_rename_source';
+    const target = '/folder_lock_rename_target';
+    const taken = '/folder_lock_rename_taken';
+
+    late FolderLockService service;
+
+    setUp(() async {
+      await FileManager.createFolder(original);
+      await FileManager.writeFile(
+        '$original/entry.sbn2',
+        [1],
+        awaitWrite: true,
+      );
+      service = FolderLockService(
+        repository: repository,
+        hasher: EchoPasswordHasher(),
+      );
+    });
+
+    tearDown(() async {
+      service.dispose();
+      await FileManager.deleteDirectory(original);
+      await FileManager.deleteDirectory(target);
+      await FileManager.deleteDirectory(taken);
+      await FileManager.deleteDirectory('$taken (2)');
+    });
+
+    test('the record is at the new path and gone from the old one', () async {
+      expect(await service.lock(original, 'hunter2'), isA<FolderLocked>());
+
+      final newPath = await FileManager.renameDirectory(
+        original,
+        'folder_lock_rename_target',
+      );
+
+      expect(newPath, target);
+      expect(await repository.exists(target), isTrue);
+      expect(await repository.exists(original), isFalse);
+      expect(await service.isLocked(target), isTrue);
+      expect(await service.unlock(target, 'hunter2'), isA<FolderUnlocked>());
+    });
+
+    test('a name that is already taken is suffixed and keeps the lock', () async {
+      await FileManager.createFolder(taken);
+      expect(await service.lock(original, 'hunter2'), isA<FolderLocked>());
+
+      final newPath = await FileManager.renameDirectory(
+        original,
+        'folder_lock_rename_taken',
+      );
+
+      expect(newPath, '$taken (2)');
+      expect(await repository.exists('$taken (2)'), isTrue);
+      expect(await service.isLocked('$taken (2)'), isTrue);
+    });
+
+    test('a folder renamed while unlocked asks again afterwards', () async {
+      await service.lock(original, 'hunter2');
+      await service.unlock(original, 'hunter2');
+      expect(await service.isOpen(original), isTrue);
+
+      final newPath = await FileManager.renameDirectory(
+        original,
+        'folder_lock_rename_target',
+      );
+      service.folderMoved(from: original, to: newPath);
+
+      expect(
+        await service.isOpen(newPath),
+        isFalse,
+        reason: 'a rename is a new path, so the folder asks again',
       );
     });
   });

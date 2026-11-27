@@ -499,11 +499,21 @@ class FileManager {
     await Future.wait(futures);
   }
 
-  static Future renameDirectory(String directoryPath, String newName) async {
+  /// Renames [directoryPath] to [newName] in place, and returns the path it
+  /// actually landed on.
+  ///
+  /// A name that is already taken is suffixed (` (2)`, ` (3)`…) instead of
+  /// merging two folders, matching how note names are made unique. Everything
+  /// inside moves with the directory, so a folder lock record keeps travelling
+  /// with its folder (PRD FR-25).
+  static Future<String> renameDirectory(
+    String directoryPath,
+    String newName,
+  ) async {
     directoryPath = _sanitisePath(directoryPath);
 
     final directory = Directory(documentsDirectory + directoryPath);
-    if (!directory.existsSync()) return;
+    if (!directory.existsSync()) return directoryPath;
 
     /// recursively find children of [directory] for [_renameReferences]
     final List<String> children = [];
@@ -513,9 +523,16 @@ class FileManager {
       }
     }
 
-    final String newPath =
-        directoryPath.substring(0, directoryPath.lastIndexOf('/') + 1) +
-        newName;
+    final String parentPath = directoryPath.substring(
+      0,
+      directoryPath.lastIndexOf('/') + 1,
+    );
+    final String newPath = _suffixDirectoryPathToMakeItUnique(
+      parentPath + newName,
+      currentPath: directoryPath,
+    );
+    if (newPath == directoryPath) return newPath;
+
     await directory.rename(documentsDirectory + newPath);
 
     for (final child in children) {
@@ -523,6 +540,23 @@ class FileManager {
       broadcastFileWrite(FileOperationType.delete, directoryPath + child);
       broadcastFileWrite(FileOperationType.write, newPath + child);
     }
+
+    return newPath;
+  }
+
+  /// [path] with ` (2)`, ` (3)`… appended until no directory is in the way.
+  static String _suffixDirectoryPathToMakeItUnique(
+    String path, {
+    required String currentPath,
+  }) {
+    var candidate = path;
+    var suffix = 1;
+    while (candidate != currentPath &&
+        Directory(documentsDirectory + candidate).existsSync()) {
+      suffix++;
+      candidate = '$path ($suffix)';
+    }
+    return candidate;
   }
 
   static Future deleteDirectory(

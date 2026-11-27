@@ -92,6 +92,11 @@ void main() {
       );
     });
 
+    test('a moved folder is covered by its new parent (FR-25)', () async {
+      expect(await nearest('/locked/moved/note.sbn2', {'/locked'}), '/locked');
+      expect(await nearest('/moved/note.sbn2', {'/locked'}), isNull);
+    });
+
     test('nothing locked is null', () async {
       expect(await nearest('/A/B', {}), isNull);
     });

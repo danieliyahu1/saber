@@ -10,6 +10,10 @@ class FolderLockScope extends InheritedNotifier<FolderLockService> {
     required super.child,
   }) : super(notifier: service);
 
+  /// The nearest service above [context], or null when there is none.
+  static FolderLockService? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<FolderLockScope>()?.notifier;
+
   /// The nearest service above [context].
   static FolderLockService of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<FolderLockScope>();

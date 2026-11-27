@@ -1,5 +1,6 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/home/grid_folders.dart';
 import 'package:saber/components/theming/adaptive_alert_dialog.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
@@ -197,8 +198,13 @@ class _MoveNoteDialogState extends State<_MoveNoteDialog> {
                           false;
                     },
                     renameFolder: (String oldName, String newName) async {
+                      final lockService = FolderLockScope.maybeOf(context);
                       final oldPath = '$currentFolder$oldName';
-                      await FileManager.renameDirectory(oldPath, newName);
+                      final newPath = await FileManager.renameDirectory(
+                        oldPath,
+                        newName,
+                      );
+                      lockService?.folderMoved(from: oldPath, to: newPath);
                       findChildrenOfCurrentFolder();
                     },
                     isFolderEmpty: (String folderName) async {
