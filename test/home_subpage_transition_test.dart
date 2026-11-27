@@ -1,11 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/data/flavor_config.dart';
+import 'package:saber/data/folder_lock/folder_lock_service.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/data/routes.dart';
 import 'package:saber/main.dart';
 import 'package:saber/pages/home/home.dart';
+
+import 'utils/folder_lock_fakes.dart';
 
 void main() {
   group('Home subpage transition', () {
@@ -29,12 +33,20 @@ void main() {
           ],
         );
         addTearDown(router.dispose);
+        final folderLock = FolderLockService(
+          repository: MemoryFolderLockRepository(),
+          hasher: EchoPasswordHasher(),
+        );
+        addTearDown(folderLock.dispose);
         await tester.pumpWidget(
-          MaterialApp.router(
-            title: 'Saber',
-            routeInformationProvider: router.routeInformationProvider,
-            routeInformationParser: router.routeInformationParser,
-            routerDelegate: router.routerDelegate,
+          FolderLockScope(
+            service: folderLock,
+            child: MaterialApp.router(
+              title: 'Saber',
+              routeInformationProvider: router.routeInformationProvider,
+              routeInformationParser: router.routeInformationParser,
+              routerDelegate: router.routerDelegate,
+            ),
           ),
         );
 

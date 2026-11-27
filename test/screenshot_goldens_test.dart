@@ -5,11 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_screenshot/golden_screenshot.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:saber/components/canvas/pencil_shader.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/home/syncing_button.dart';
 import 'package:saber/components/settings/nextcloud_profile.dart';
 import 'package:saber/components/theming/saber_theme.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/flavor_config.dart';
+import 'package:saber/data/folder_lock/folder_lock_service.dart';
 import 'package:saber/data/locales.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/data/sentry/sentry_init.dart';
@@ -19,6 +21,7 @@ import 'package:saber/pages/home/home.dart';
 import 'package:saber/pages/user/login.dart';
 import 'package:yaru/yaru.dart';
 
+import 'utils/folder_lock_fakes.dart';
 import 'utils/test_mock_channel_handlers.dart';
 import 'utils/test_user.dart';
 
@@ -180,12 +183,20 @@ void _screenshot({
           theme = theme.copyWith(textTheme: materialTheme.textTheme);
         }
 
+        final folderLock = FolderLockService(
+          repository: MemoryFolderLockRepository(),
+          hasher: EchoPasswordHasher(),
+        );
+        addTearDown(folderLock.dispose);
+
         final widget = ScreenshotApp.withConditionalTitlebar(
           theme: theme,
           device: device,
           frameColors: frameColors,
           title: 'Saber',
-          home: TranslationProvider(child: child),
+          home: TranslationProvider(
+            child: FolderLockScope(service: folderLock, child: child),
+          ),
         );
         await tester.pumpWidget(widget);
         await tester.pump();
