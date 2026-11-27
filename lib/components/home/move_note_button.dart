@@ -172,6 +172,7 @@ class _MoveNoteDialogState extends State<_MoveNoteDialog> {
                   GridFolders(
                     isAtRoot: currentFolder == '/',
                     crossAxisCount: 3,
+                    parentPath: currentFolder,
                     onTap: (String folder) {
                       setState(() {
                         if (folder == '..') {

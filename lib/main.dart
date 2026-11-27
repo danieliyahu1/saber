@@ -15,9 +15,14 @@ import 'package:path_to_regexp/path_to_regexp.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:printing/printing.dart';
 import 'package:saber/components/canvas/pencil_shader.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
+import 'package:saber/components/home/note_unlock_gate.dart';
 import 'package:saber/components/theming/dynamic_material_app.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/flavor_config.dart';
+import 'package:saber/data/folder_lock/file_folder_lock_repository.dart';
+import 'package:saber/data/folder_lock/folder_lock_service.dart';
+import 'package:saber/data/folder_lock/pbkdf2_password_hasher.dart';
 import 'package:saber/data/nextcloud/nc_http_overrides.dart';
 import 'package:saber/data/nextcloud/saber_syncer.dart';
 import 'package:saber/data/prefs.dart';
@@ -252,9 +257,12 @@ class const App({super.key}) extends StatefulWidget {
       ),
       GoRoute(
         path: RoutePaths.edit,
-        builder: (context, state) => Editor(
-          path: state.uri.queryParameters['path'],
-          pdfPath: state.uri.queryParameters['pdfPath'],
+        builder: (context, state) => NoteUnlockGate(
+          notePath: state.uri.queryParameters['path'],
+          builder: (context) => Editor(
+            path: state.uri.queryParameters['path'],
+            pdfPath: state.uri.queryParameters['pdfPath'],
+          ),
         ),
       ),
       GoRoute(
@@ -309,6 +317,13 @@ class const App({super.key}) extends StatefulWidget {
 class _AppState extends State<App> {
   StreamSubscription? _intentDataStreamSubscription;
 
+  /// The one service for the process: unlocks are session facts and must be
+  /// shared by every gate and badge (PRD FR-14).
+  final _folderLockService = FolderLockService(
+    repository: const FileFolderLockRepository(),
+    hasher: Pbkdf2PasswordHasher(),
+  );
+
   @override
   void initState() {
     setupSharingIntent();
@@ -338,12 +353,16 @@ class _AppState extends State<App> {
 
   @override
   Widget build(BuildContext context) {
-    return DynamicMaterialApp(title: 'Saber', router: App._router);
+    return FolderLockScope(
+      service: _folderLockService,
+      child: DynamicMaterialApp(title: 'Saber', router: App._router),
+    );
   }
 
   @override
   void dispose() {
     _intentDataStreamSubscription?.cancel();
+    _folderLockService.dispose();
     super.dispose();
   }
 }

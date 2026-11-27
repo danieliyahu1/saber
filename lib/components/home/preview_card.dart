@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:saber/components/canvas/_stroke.dart';
 import 'package:saber/components/canvas/inner_canvas.dart';
 import 'package:saber/components/canvas/invert_widget.dart';
+import 'package:saber/components/home/note_unlock_gate.dart';
 import 'package:saber/components/home/sync_indicator.dart';
 import 'package:saber/data/constants.dart';
 import 'package:saber/data/extensions/color_extensions.dart';
@@ -238,7 +239,10 @@ class _PreviewCardState extends State<PreviewCard> {
           closedElevation: 0,
           closedBuilder: (context, action) => card,
           openColor: colorScheme.surface,
-          openBuilder: (context, action) => Editor(path: widget.filePath),
+          openBuilder: (context, action) => NoteUnlockGate(
+            notePath: widget.filePath,
+            builder: (context) => Editor(path: widget.filePath),
+          ),
           transitionDuration: transitionDuration,
           routeSettings: RouteSettings(
             name: RoutePaths.editFilePath(widget.filePath),

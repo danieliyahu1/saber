@@ -106,6 +106,7 @@ class Translations$home$en {
 	late final Translations$home$deleteNoteDialog$en deleteNoteDialog = Translations$home$deleteNoteDialog$en.internal(_root);
 	late final Translations$home$renameFolder$en renameFolder = Translations$home$renameFolder$en.internal(_root);
 	late final Translations$home$deleteFolder$en deleteFolder = Translations$home$deleteFolder$en.internal(_root);
+	late final Translations$home$folderLock$en folderLock = Translations$home$folderLock$en.internal(_root);
 	late final Translations$home$sort$en sort = Translations$home$sort$en.internal(_root);
 	late final Translations$home$layout$en layout = Translations$home$layout$en.internal(_root);
 }
@@ -559,6 +560,51 @@ class Translations$home$deleteFolder$en {
 
 	/// en: 'Also delete all notes inside this folder'
 	String get alsoDeleteContents => 'Also delete all notes inside this folder';
+}
+
+// Path: home.folderLock
+class Translations$home$folderLock$en {
+	Translations$home$folderLock$en.internal(this._root);
+
+	final Translations _root; // ignore: unused_field
+
+	// Translations
+
+	/// en: 'This folder is locked.'
+	String get thisFolderIsLocked => 'This folder is locked.';
+
+	/// en: 'Password'
+	String get password => 'Password';
+
+	/// en: 'Show password'
+	String get showPassword => 'Show password';
+
+	/// en: 'Unlock'
+	String get unlock => 'Unlock';
+
+	/// en: 'Locked'
+	String get locked => 'Locked';
+
+	/// en: 'Lock folder'
+	String get lockFolder => 'Lock folder';
+
+	/// en: 'Choose a password for this folder. You will need it to see what is inside.'
+	String get lockBody => 'Choose a password for this folder. You will need it to see what is inside.';
+
+	/// en: 'Lock'
+	String get lock => 'Lock';
+
+	/// en: 'There is no way to recover this password.'
+	String get noRecovery => 'There is no way to recover this password.';
+
+	/// en: 'If you forget it, this folder cannot be opened again.'
+	String get forgotOnPhone => 'If you forget it, this folder cannot be opened again.';
+
+	/// en: 'If you forget it, you can remove the lock by hand.'
+	String get forgotOnComputer => 'If you forget it, you can remove the lock by hand.';
+
+	/// en: 'Could not lock this folder.'
+	String get lockFailed => 'Could not lock this folder.';
 }
 
 // Path: home.sort

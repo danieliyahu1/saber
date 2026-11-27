@@ -234,17 +234,22 @@ class FileManager {
   /// [lastModified], if specified.
   /// This is useful when downloading remote files, to make sure that the
   /// timestamp is the same locally and remotely.
+  ///
+  /// Set [trackAsRecent] to false for files that are not notes, such as a
+  /// folder's lock record, which must not appear in Home's recent notes
+  /// (PRD FR-20).
   static Future<void> writeFile(
     String filePath,
     List<int> toWrite, {
     bool awaitWrite = false,
     bool alsoUpload = true,
+    bool trackAsRecent = true,
     DateTime? lastModified,
   }) async {
     filePath = _sanitisePath(filePath);
     log.fine('Writing to $filePath');
 
-    await _saveFileAsRecentlyAccessed(filePath);
+    if (trackAsRecent) await _saveFileAsRecentlyAccessed(filePath);
 
     final file = getFile(filePath);
     await _createFileDirectory(filePath);

@@ -1,16 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/theming/dynamic_material_app.dart';
 import 'package:saber/components/theming/saber_theme.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/flavor_config.dart';
+import 'package:saber/data/folder_lock/folder_lock_service.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/data/routes.dart';
 import 'package:saber/i18n/strings.g.dart';
 import 'package:saber/pages/home/browse.dart';
 import 'package:saber/pages/home/home.dart';
 
+import 'utils/folder_lock_fakes.dart';
 import 'utils/test_mock_channel_handlers.dart';
 
 void main() {
@@ -61,6 +64,12 @@ void main() {
 class _BrowseApp extends StatelessWidget {
   const new({this.path});
   final String? path;
+
+  static final _folderLockService = FolderLockService(
+    repository: MemoryFolderLockRepository(),
+    hasher: EchoPasswordHasher(),
+  );
+
   @override
   Widget build(BuildContext context) {
     final theme = SaberTheme.createThemeFromSeed(
@@ -80,13 +89,16 @@ class _BrowseApp extends StatelessWidget {
         ),
       ],
     );
-    return TranslationProvider(
-      child: ExplicitlyThemedApp(
-        title: 'Saber',
-        router: router,
-        themeMode: ThemeMode.light,
-        theme: theme,
-        darkTheme: theme,
+    return FolderLockScope(
+      service: _folderLockService,
+      child: TranslationProvider(
+        child: ExplicitlyThemedApp(
+          title: 'Saber',
+          router: router,
+          themeMode: ThemeMode.light,
+          theme: theme,
+          darkTheme: theme,
+        ),
       ),
     );
   }
