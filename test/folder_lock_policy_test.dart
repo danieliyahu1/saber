@@ -85,6 +85,13 @@ void main() {
       expect(await nearest('/A/B/C/note.sbn2', {'/A', '/A/B'}), '/A/B');
     });
 
+    test('three locked ancestors: the closest still wins', () async {
+      expect(
+        await nearest('/A/B/C/note.sbn2', {'/A', '/A/B', '/A/B/C'}),
+        '/A/B/C',
+      );
+    });
+
     test('nothing locked is null', () async {
       expect(await nearest('/A/B', {}), isNull);
     });

@@ -160,6 +160,35 @@ class FolderLockService extends ChangeNotifier {
     return lockedFolder == null || _unlockedFolders.contains(lockedFolder);
   }
 
+  /// Carries session entries across a rename or a move of [from] to [to].
+  ///
+  /// The renamed folder itself is closed again: it now has a different path,
+  /// so it asks afresh (SABER-30). A folder *inside* it keeps the session it
+  /// was given, at its new path — moving the parent neither opens nor closes
+  /// it (SABER-14). `/A` never touches `/AB`.
+  void folderMoved({required String from, required String to}) {
+    final oldPrefix = FolderLockPolicy.normalise(from);
+    final newPrefix = FolderLockPolicy.normalise(to);
+    if (oldPrefix == newPrefix) return;
+
+    final moved = <String>{};
+    var changed = false;
+    for (final open in _unlockedFolders.toList()) {
+      if (open == oldPrefix) {
+        _unlockedFolders.remove(open);
+        changed = true;
+      } else if (FolderLockPolicy.isInside(oldPrefix, open)) {
+        _unlockedFolders.remove(open);
+        moved.add('$newPrefix${open.substring(oldPrefix.length)}');
+        changed = true;
+      }
+    }
+    if (!changed) return;
+
+    _unlockedFolders.addAll(moved);
+    notifyListeners();
+  }
+
   /// Closes every open folder. The app calls this when it is put away (FR-28).
   void relockAll() {
     if (_unlockedFolders.isEmpty) return;

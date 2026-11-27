@@ -220,6 +220,10 @@ class _BrowsePageState extends State<BrowsePage> {
             renameFolder: (String oldName, String newName) async {
               final oldPath = '${path ?? ''}/$oldName';
               await FileManager.renameDirectory(oldPath, newName);
+              _folderLockService?.folderMoved(
+                from: oldPath,
+                to: '${path ?? ''}/$newName',
+              );
               findChildrenOfPath();
             },
             isFolderEmpty: (String folderName) async {

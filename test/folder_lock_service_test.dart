@@ -283,6 +283,98 @@ void main() {
     );
   });
 
+  group('Nested locks (FR-15, SABER-14)', () {
+    test('the outer password does not open the inner lock', () async {
+      await service.lock('/notes', 'outer');
+      await service.lock('/notes/private', 'inner');
+
+      expect(await service.unlock('/notes', 'outer'), isA<FolderUnlocked>());
+      expect(await service.isOpen('/notes'), isTrue);
+      expect(await service.isOpen('/notes/private'), isFalse);
+      expect(await service.isOpen('/notes/private/diary.sbn2'), isFalse);
+
+      expect(
+        await service.unlock('/notes/private', 'inner'),
+        isA<FolderUnlocked>(),
+      );
+      expect(await service.isOpen('/notes/private/diary.sbn2'), isTrue);
+    });
+
+    test('three levels deep behave the same', () async {
+      await service.lock('/a', 'one-up');
+      await service.lock('/a/b', 'two-up');
+      await service.lock('/a/b/c', 'three-up');
+
+      await service.unlock('/a', 'one-up');
+      expect(await service.isOpen('/a'), isTrue);
+      expect(await service.isOpen('/a/b'), isFalse);
+      expect(await service.isOpen('/a/b/c'), isFalse);
+
+      await service.unlock('/a/b', 'two-up');
+      expect(await service.isOpen('/a/b'), isTrue);
+      expect(await service.isOpen('/a/b/c'), isFalse);
+
+      await service.unlock('/a/b/c', 'three-up');
+      expect(await service.isOpen('/a/b/c/note.sbn2'), isTrue);
+    });
+
+    test(
+      'renaming a parent keeps an unlocked child open at its new path',
+      () async {
+        await service.lock('/notes', 'outer');
+        await service.lock('/notes/private', 'inner');
+        await service.unlock('/notes', 'outer');
+        await service.unlock('/notes/private', 'inner');
+
+        // FileManager moves the directory; its records move with it.
+        repository.locks['/team'] = repository.locks.remove('/notes')!;
+        repository.locks['/team/private'] = repository.locks.remove(
+          '/notes/private',
+        )!;
+
+        service.folderMoved(from: '/notes', to: '/team');
+
+        expect(
+          await service.isOpen('/team/private'),
+          isTrue,
+          reason: 'the child keeps the session it was given',
+        );
+        expect(await service.isLocked('/team'), isTrue);
+        expect(
+          await service.isOpen('/team'),
+          isFalse,
+          reason: 'the renamed folder itself asks again',
+        );
+      },
+    );
+
+    test('renaming /A leaves the session of /AB alone', () async {
+      await service.lock('/A', 'alpha');
+      await service.lock('/AB', 'bravo');
+      await service.unlock('/A', 'alpha');
+      await service.unlock('/AB', 'bravo');
+
+      repository.locks['/C'] = repository.locks.remove('/A')!;
+      service.folderMoved(from: '/A', to: '/C');
+
+      expect(
+        await service.isOpen('/AB'),
+        isTrue,
+        reason: '/AB is not inside /A, so its entry must survive untouched',
+      );
+      expect(await service.isOpen('/C'), isFalse);
+    });
+
+    test('a move with nothing open stays quiet', () {
+      var notifications = 0;
+      service.addListener(() => notifications++);
+
+      service.folderMoved(from: '/notes', to: '/team');
+
+      expect(notifications, 0);
+    });
+  });
+
   group('FolderLockService.remove', () {
     setUp(() async {
       await service.lock('/notes', 'hunter2');

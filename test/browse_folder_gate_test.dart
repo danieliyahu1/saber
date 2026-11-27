@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/flavor_config.dart';
 import 'package:saber/data/folder_lock/folder_lock_service.dart';
 import 'package:saber/data/prefs.dart';
+import 'package:saber/data/routes.dart';
 import 'package:saber/pages/home/browse.dart';
 
 import 'utils/folder_lock_fakes.dart';
@@ -96,13 +98,56 @@ void main() {
       expect(find.text('This folder is locked.'), findsOneWidget);
       expect(find.text('secret note'), findsNothing);
     });
+
+    testWidgets('two nested locks ask for each password in turn', (
+      tester,
+    ) async {
+      repository.locks['/locked'] = lockAccepting('outer');
+      repository.locks['/locked/subfolder'] = lockAccepting('inner');
+
+      await tester.pumpWidget(_app(service));
+      await tester.pumpAndSettle();
+      expect(find.text('This folder is locked.'), findsOneWidget);
+
+      // The outer password opens the outer folder only.
+      await tester.enterText(find.byType(TextField), 'outer');
+      await tester.tap(find.text('Unlock'));
+      await tester.pumpAndSettle();
+      expect(find.text('secret note'), findsOneWidget);
+
+      // The inner folder has its own password.
+      await tester.tap(find.text('subfolder'));
+      await tester.pumpAndSettle();
+      expect(find.text('This folder is locked.'), findsOneWidget);
+      expect(find.text('secret note'), findsNothing);
+
+      await tester.enterText(find.byType(TextField), 'outer');
+      await tester.tap(find.text('Unlock'));
+      await tester.pumpAndSettle();
+      expect(find.text('Wrong password.'), findsOneWidget);
+      expect(find.text('secret note'), findsNothing);
+
+      await tester.enterText(find.byType(TextField), 'inner');
+      await tester.tap(find.text('Unlock'));
+      await tester.pumpAndSettle();
+      expect(find.text('secret note'), findsOneWidget);
+    });
   });
 }
 
-Widget _app(FolderLockService service, {String path = '/locked'}) =>
-    MaterialApp(
-      home: FolderLockScope(
-        service: service,
-        child: BrowsePage(path: path),
+Widget _app(FolderLockService service, {String path = '/locked'}) {
+  final router = GoRouter(
+    initialLocation: HomeRoutes.browseFilePath(path),
+    routes: [
+      GoRoute(
+        path: RoutePaths.home,
+        builder: (context, state) =>
+            BrowsePage(path: state.uri.queryParameters['path']),
       ),
-    );
+    ],
+  );
+  return FolderLockScope(
+    service: service,
+    child: MaterialApp.router(routerConfig: router),
+  );
+}
