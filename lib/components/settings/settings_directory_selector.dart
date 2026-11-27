@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/theming/adaptive_alert_dialog.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/nextcloud/saber_syncer.dart';
@@ -97,19 +98,22 @@ class _DirectorySelectorState extends State<DirectorySelector> {
   late var _isEmpty = true;
 
   Future<void> _pickDir() async {
-    // ignore: deprecated_member_use - TODO(adil192): We need to migrate FileManager to use URIs to use the replacement `FilePicker.pickDirectory`
-    final directory = await FilePicker.getDirectoryPath(
-      dialogTitle: widget.title,
-      initialDirectory: _directory,
-      androidOptions: defaultTargetPlatform == .android
-          ? const FilePickerAndroidOptions(
-              safOptions: .new(
-                grant: .lifetime,
-                accessMode: .readWrite,
-                persistGrant: true,
-              ),
-            )
-          : const .new(),
+    final directory = await FolderLockScope.runSystemFlow(
+      context,
+      // ignore: deprecated_member_use - TODO(adil192): We need to migrate FileManager to use URIs to use the replacement `FilePicker.pickDirectory`
+      () => FilePicker.getDirectoryPath(
+        dialogTitle: widget.title,
+        initialDirectory: _directory,
+        androidOptions: defaultTargetPlatform == .android
+            ? const FilePickerAndroidOptions(
+                safOptions: .new(
+                  grant: .lifetime,
+                  accessMode: .readWrite,
+                  persistGrant: true,
+                ),
+              )
+            : const .new(),
+      ),
     );
 
     if (directory == null) return;

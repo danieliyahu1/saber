@@ -23,6 +23,7 @@ import 'package:saber/components/canvas/canvas_image.dart';
 import 'package:saber/components/canvas/image/editor_image.dart';
 import 'package:saber/components/canvas/save_indicator.dart';
 import 'package:saber/components/editor/read_only_banner.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/theming/adaptive_alert_dialog.dart';
 import 'package:saber/components/theming/adaptive_icon.dart';
 import 'package:saber/components/theming/dynamic_material_app.dart';
@@ -1264,26 +1265,29 @@ class EditorState extends State<Editor> {
   }
 
   Future<List<_PhotoInfo>> _pickPhotosWithFilePicker() async {
-    final List<PlatformFile> files = await FilePicker.pickFiles(
-      type: FileType.custom,
-      // Taken from
-      // https://github.com/brendan-duncan/image/blob/main/doc/formats.md
-      // (plus .svg)
-      allowedExtensions: [
-        'jpg',
-        'jpeg',
-        'png',
-        'gif',
-        'tiff',
-        'bmp',
-        'tga',
-        'ico',
-        'pvrtc',
-        'svg',
-        'webp',
-        'psd',
-        'exr',
-      ],
+    final List<PlatformFile> files = await FolderLockScope.runSystemFlow(
+      context,
+      () => FilePicker.pickFiles(
+        type: FileType.custom,
+        // Taken from
+        // https://github.com/brendan-duncan/image/blob/main/doc/formats.md
+        // (plus .svg)
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'gif',
+          'tiff',
+          'bmp',
+          'tga',
+          'ico',
+          'pvrtc',
+          'svg',
+          'webp',
+          'psd',
+          'exr',
+        ],
+      ),
     );
     if (files.isEmpty) return const [];
 
@@ -1304,9 +1308,12 @@ class EditorState extends State<Editor> {
     if (coreInfo.readOnly) return false;
     if (!Editor.canRasterPdf) return false;
 
-    final file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
+    final file = await FolderLockScope.runSystemFlow(
+      context,
+      () => FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      ),
     );
     if (file == null) return false;
 

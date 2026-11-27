@@ -14,6 +14,17 @@ class FolderLockScope extends InheritedNotifier<FolderLockService> {
   static FolderLockService? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<FolderLockScope>()?.notifier;
 
+  /// Runs [action] — a share sheet, a file picker or a permission prompt —
+  /// without treating the system UI covering the app as leaving (FR-28,
+  /// DEC-21). Without a scope the action simply runs.
+  static Future<T> runSystemFlow<T>(
+    BuildContext context,
+    Future<T> Function() action,
+  ) {
+    final service = maybeOf(context);
+    return service == null ? action() : service.runDuringSystemFlow(action);
+  }
+
   /// The nearest service above [context].
   static FolderLockService of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<FolderLockScope>();

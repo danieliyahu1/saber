@@ -196,6 +196,39 @@ class FolderLockService extends ChangeNotifier {
     notifyListeners();
   }
 
+  var _systemFlows = 0;
+
+  /// Whether a share sheet, file picker or permission prompt is in front of
+  /// the app right now.
+  ///
+  /// The app being covered by one of those is not the person leaving
+  /// (FR-28, DEC-21).
+  bool get isInSystemFlow => _systemFlows > 0;
+
+  /// Whether the app is actually in front of the person.
+  ///
+  /// [FolderLockLifecycle] points this at the real binding, so a flow that
+  /// ends while the app is in the background still relocks. Tests and
+  /// headless use keep the default.
+  bool Function() appIsForeground = defaultForegroundCheck;
+
+  /// Runs [action] — opening a share sheet, a file picker or a permission
+  /// prompt — without treating the system UI covering the app as leaving.
+  ///
+  /// If the app is genuinely in the background when the flow ends, the session
+  /// is cleared then, not before (FR-28).
+  Future<T> runDuringSystemFlow<T>(Future<T> Function() action) async {
+    _systemFlows++;
+    try {
+      return await action();
+    } finally {
+      _systemFlows--;
+      if (_systemFlows == 0 && !appIsForeground()) relockAll();
+    }
+  }
+
+  static bool defaultForegroundCheck() => true;
+
   /// Drops session entries whose record has gone, such as a folder deleted
   /// outside the app (HLD §12).
   Future<void> _forgetUnlocksWithoutRecords() async {

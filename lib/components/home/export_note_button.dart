@@ -4,6 +4,7 @@ import 'package:archive/archive_io.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/theming/adaptive_circular_progress_indicator.dart';
 import 'package:saber/data/editor/editor_core_info.dart';
 import 'package:saber/data/editor/editor_exporter.dart';
@@ -55,20 +56,26 @@ class _ExportNoteButtonState extends State<ExportNoteButton> {
 
     if (!mounted) return;
     if (selectedFiles.length == 1) {
-      await FileManager.exportFile(
-        files.single.name,
-        files.single.content,
-        context: context,
+      await FolderLockScope.runSystemFlow(
+        context,
+        () => FileManager.exportFile(
+          files.single.name,
+          files.single.content,
+          context: context,
+        ),
       );
     } else if (selectedFiles.length > 1) {
       final archive = Archive();
       for (final archiveFile in files) {
         archive.addFile(archiveFile);
       }
-      await FileManager.exportFile(
-        '${files.first.name}.zip',
-        Uint8List.fromList(ZipEncoder().encode(archive)),
-        context: context,
+      await FolderLockScope.runSystemFlow(
+        context,
+        () => FileManager.exportFile(
+          '${files.first.name}.zip',
+          Uint8List.fromList(ZipEncoder().encode(archive)),
+          context: context,
+        ),
       );
     }
 
