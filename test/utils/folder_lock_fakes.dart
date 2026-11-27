@@ -17,6 +17,7 @@ class MemoryFolderLockRepository implements FolderLockRepository {
   var existsCalls = 0;
   var reads = 0;
   var failWrites = false;
+  var failDeletes = false;
 
   @override
   Future<bool> exists(String folderPath) async {
@@ -47,6 +48,7 @@ class MemoryFolderLockRepository implements FolderLockRepository {
 
   @override
   Future<bool> delete(String folderPath) async {
+    if (failDeletes) return false;
     locks.remove(folderPath);
     return true;
   }

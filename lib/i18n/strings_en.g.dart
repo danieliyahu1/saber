@@ -605,6 +605,18 @@ class Translations$home$folderLock$en {
 
 	/// en: 'Could not lock this folder.'
 	String get lockFailed => 'Could not lock this folder.';
+
+	/// en: 'Remove lock'
+	String get removeLock => 'Remove lock';
+
+	/// en: 'Enter the password to remove the lock from this folder.'
+	String get removeLockBody => 'Enter the password to remove the lock from this folder.';
+
+	/// en: 'Remove'
+	String get remove => 'Remove';
+
+	/// en: 'Could not remove the lock.'
+	String get removeFailed => 'Could not remove the lock.';
 }
 
 // Path: home.sort
