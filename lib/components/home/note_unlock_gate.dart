@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/home/unlock_folder_screen.dart';
+import 'package:saber/data/folder_lock/folder_lock_service.dart';
 
 /// Puts the password screen in front of a note, wherever the note is opened
 /// from.
@@ -30,11 +31,30 @@ class _NoteUnlockGateState extends State<NoteUnlockGate> {
 
   var _check = 0;
 
+  FolderLockService? _service;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
+    final service = FolderLockScope.of(context);
+    if (!identical(service, _service)) {
+      _service?.removeListener(_onLockChanged);
+      service.addListener(_onLockChanged);
+      _service = service;
+    }
     _checkLock();
   }
+
+  @override
+  void dispose() {
+    _service?.removeListener(_onLockChanged);
+    super.dispose();
+  }
+
+  /// A lock or a relock must change what is on screen immediately: closing the
+  /// app while a note is open has to take the editor away (PRD FR-29).
+  void _onLockChanged() => _checkLock();
 
   Future<void> _checkLock() async {
     final notePath = widget.notePath;
@@ -44,7 +64,7 @@ class _NoteUnlockGateState extends State<NoteUnlockGate> {
     }
 
     final check = ++_check;
-    final mayBeShown = await FolderLockScope.of(context).isOpen(notePath);
+    final mayBeShown = await _service!.isOpen(notePath);
     if (!mounted || check != _check) return;
     if (_mayBeShown != mayBeShown) {
       setState(() => _mayBeShown = mayBeShown);
