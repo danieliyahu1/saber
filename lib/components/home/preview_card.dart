@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:saber/components/canvas/_stroke.dart';
 import 'package:saber/components/canvas/inner_canvas.dart';
 import 'package:saber/components/canvas/invert_widget.dart';
+import 'package:saber/components/home/note_unlock_gate.dart';
 import 'package:saber/components/home/sync_indicator.dart';
 import 'package:saber/data/constants.dart';
 import 'package:saber/data/extensions/color_extensions.dart';
@@ -21,12 +22,20 @@ class PreviewCard extends StatefulWidget {
     required this.toggleSelection,
     required this.selected,
     required this.isAnythingSelected,
+    this.isLocked = false,
   }) : super(key: ValueKey('PreviewCard$filePath'));
 
   final String filePath;
   final bool selected;
   final bool isAnythingSelected;
   final void Function(String, bool) toggleSelection;
+
+  /// Whether the note lives in a folder that is locked and closed right now.
+  ///
+  /// A locked note shows its title and a lock mark and is never asked for its
+  /// thumbnail, even if an old one is still on disk (PRD FR-20, FR-21). Taps
+  /// still go through [NoteUnlockGate].
+  final bool isLocked;
 
   @override
   State<PreviewCard> createState() => _PreviewCardState();
@@ -49,6 +58,22 @@ class _PreviewCardState extends State<PreviewCard> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _loadThumbnail();
+  }
+
+  @override
+  void didUpdateWidget(covariant PreviewCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isLocked != widget.isLocked) _loadThumbnail();
+  }
+
+  /// Reads the note's preview, unless the note is locked: a stored thumbnail
+  /// may predate the lock and must not be shown (PRD FR-21).
+  void _loadThumbnail() {
+    if (widget.isLocked) {
+      thumbnail.image = null;
+      return;
+    }
 
     final imageFile = FileManager.getFile(
       '${widget.filePath}${Editor.extension}.p',
@@ -66,6 +91,7 @@ class _PreviewCardState extends State<PreviewCard> {
   StreamSubscription? fileWriteSubscription;
   void fileWriteListener(FileOperation event) {
     if (event.filePath != widget.filePath) return;
+    if (widget.isLocked) return;
     if (event.type == .delete) {
       thumbnail.image = null;
     } else if (event.type == .write) {
@@ -154,7 +180,9 @@ class _PreviewCardState extends State<PreviewCard> {
                             ),
                             child: InvertWidget(
                               invert: invert,
-                              child: thumbnail.doesImageExist
+                              child: widget.isLocked
+                                  ? const _LockedThumbnail()
+                                  : thumbnail.doesImageExist
                                   ? Image(
                                       image: thumbnail.image!,
                                       alignment: .topCenter,
@@ -238,7 +266,10 @@ class _PreviewCardState extends State<PreviewCard> {
           closedElevation: 0,
           closedBuilder: (context, action) => card,
           openColor: colorScheme.surface,
-          openBuilder: (context, action) => Editor(path: widget.filePath),
+          openBuilder: (context, action) => NoteUnlockGate(
+            notePath: widget.filePath,
+            builder: (context) => Editor(path: widget.filePath),
+          ),
           transitionDuration: transitionDuration,
           routeSettings: RouteSettings(
             name: RoutePaths.editFilePath(widget.filePath),
@@ -270,6 +301,28 @@ class const _FallbackThumbnail() extends StatelessWidget {
             fontStyle: FontStyle.italic,
           ),
           textAlign: .center,
+        ),
+      ),
+    );
+  }
+}
+
+class const _LockedThumbnail() extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: InnerCanvas.defaultBackgroundColor,
+      child: Center(
+        child: Tooltip(
+          message: t.home.folderLock.locked,
+          child: Semantics(
+            label: t.home.folderLock.locked,
+            child: Icon(
+              Icons.lock,
+              size: 40,
+              color: Stroke.defaultColor.withValues(alpha: 0.7),
+            ),
+          ),
         ),
       ),
     );

@@ -1,7 +1,10 @@
 import 'package:cupertino_ui/cupertino_ui.dart' show CupertinoIcons;
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:path/path.dart' as p;
 import 'package:saber/components/home/delete_folder_button.dart';
+import 'package:saber/components/home/lock_badge.dart';
+import 'package:saber/components/home/lock_folder_button.dart';
 import 'package:saber/components/home/new_folder_dialog.dart';
 import 'package:saber/components/home/rename_folder_button.dart';
 import 'package:saber/components/theming/adaptive_icon.dart';
@@ -19,6 +22,7 @@ class GridFolders extends StatelessWidget {
     required this.isFolderEmpty,
     required this.deleteFolder,
     required this.doesFolderExist,
+    required this.parentPath,
     required this.folders,
   });
 
@@ -31,6 +35,9 @@ class GridFolders extends StatelessWidget {
   final Future<void> Function(String oldName, String newName) renameFolder;
   final Future<bool> Function(String) isFolderEmpty;
   final Future<void> Function(String) deleteFolder;
+
+  /// The folder these folders live in; null means the root.
+  final String? parentPath;
 
   final List<String> folders;
 
@@ -56,6 +63,7 @@ class GridFolders extends StatelessWidget {
           return _GridFolder(
             cardType: cardType,
             folderName: folderName,
+            parentPath: parentPath,
             createFolder: createFolder,
             doesFolderExist: doesFolderExist,
             renameFolder: renameFolder,
@@ -73,6 +81,7 @@ class _GridFolder extends StatefulWidget {
   const new({
     required this.cardType,
     required this.folderName,
+    required this.parentPath,
     required this.createFolder,
     required this.doesFolderExist,
     required this.renameFolder,
@@ -86,6 +95,7 @@ class _GridFolder extends StatefulWidget {
 
   final _FolderCardType cardType;
   final String? folderName;
+  final String? parentPath;
   final void Function(String) createFolder;
   final bool Function(String) doesFolderExist;
   final Future<void> Function(String oldName, String newName) renameFolder;
@@ -107,6 +117,9 @@ class _GridFolderState extends State<_GridFolder> {
       colorScheme.primary.withValues(alpha: 0.05),
       colorScheme.surface,
     );
+    final folderPath = widget.folderName == null
+        ? null
+        : p.join(widget.parentPath ?? '/', widget.folderName!);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -166,6 +179,12 @@ class _GridFolderState extends State<_GridFolder> {
                           ),
                         ),
                       ),
+                      if (folderPath != null)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: LockBadge(folderPath: folderPath),
+                        ),
                       if (widget.cardType == .realFolder)
                         Positioned.fill(
                           child: ValueListenableBuilder(
@@ -197,6 +216,8 @@ class _GridFolderState extends State<_GridFolder> {
                                   mainAxisAlignment: .center,
                                   crossAxisAlignment: .end,
                                   children: [
+                                    if (folderPath != null)
+                                      LockFolderButton(folderPath: folderPath),
                                     RenameFolderButton(
                                       folderName: widget.folderName!,
                                       doesFolderExist: widget.doesFolderExist,

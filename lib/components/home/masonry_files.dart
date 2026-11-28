@@ -10,11 +10,16 @@ class MasonryFiles extends StatefulWidget {
     required this.files,
     required this.selectedFiles,
     required this.crossAxisCount,
+    this.lockedFiles = const {},
   });
 
   final List<String> files;
   final int crossAxisCount;
   final ValueNotifier<List<String>> selectedFiles;
+
+  /// Files whose folder is locked and closed: they may show a title and a lock
+  /// mark, but never a preview (PRD FR-20).
+  final Set<String> lockedFiles;
 
   @override
   State<MasonryFiles> createState() => _MasonryFilesState();
@@ -49,6 +54,7 @@ class _MasonryFilesState extends State<MasonryFiles> {
             toggleSelection: toggleSelection,
             selected: widget.selectedFiles.value.contains(file),
             isAnythingSelected: isAnythingSelected,
+            isLocked: widget.lockedFiles.contains(file),
           ),
         );
       },

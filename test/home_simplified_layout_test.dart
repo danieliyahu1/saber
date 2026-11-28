@@ -1,15 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_screenshot/golden_screenshot.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/home/syncing_button.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
 import 'package:saber/data/flavor_config.dart';
+import 'package:saber/data/folder_lock/folder_lock_service.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/data/sentry/_sentry_init_foss.dart';
 import 'package:saber/i18n/strings.g.dart';
 import 'package:saber/pages/home/home.dart';
 
 import 'screenshot_goldens_test.dart';
+import 'utils/folder_lock_fakes.dart';
 import 'utils/test_mock_channel_handlers.dart';
 import 'utils/test_user.dart';
 
@@ -34,12 +37,20 @@ void main() {
 
     testGoldens('golden', (tester) async {
       final device = GoldenSmallDevices.androidPhone.device;
+      final folderLock = FolderLockService(
+        repository: MemoryFolderLockRepository(),
+        hasher: EchoPasswordHasher(),
+      );
+      addTearDown(folderLock.dispose);
 
       final widget = ScreenshotApp.withConditionalTitlebar(
         device: device,
         title: 'Saber',
         home: TranslationProvider(
-          child: const HomePage(subpage: HomePage.recentSubpage, path: ''),
+          child: FolderLockScope(
+            service: folderLock,
+            child: const HomePage(subpage: HomePage.recentSubpage, path: ''),
+          ),
         ),
       );
       await tester.pumpWidget(widget);

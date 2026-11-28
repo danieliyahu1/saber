@@ -69,6 +69,23 @@ home:
     deleteName: Delete $f
     delete: Delete
     alsoDeleteContents: Also delete all notes inside this folder
+  folderLock:
+    thisFolderIsLocked: This folder is locked.
+    password: Password
+    showPassword: Show password
+    unlock: Unlock
+    locked: Locked
+    lockFolder: Lock folder
+    lockBody: Choose a password for this folder. You will need it to see what is inside.
+    lock: Lock
+    noRecovery: There is no way to recover this password.
+    forgotOnPhone: If you forget it, this folder cannot be opened again.
+    forgotOnComputer: If you forget it, you can remove the lock by hand.
+    lockFailed: Could not lock this folder.
+    removeLock: Remove lock
+    removeLockBody: Enter the password to remove the lock from this folder.
+    remove: Remove
+    removeFailed: Could not remove the lock.
   sort:
     sortBy: Sort by
     nameAToZ: Name (A-Z)

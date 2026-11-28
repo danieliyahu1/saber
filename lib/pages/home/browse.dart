@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import 'package:saber/components/home/delete_note_button.dart';
 import 'package:saber/components/home/export_note_button.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/home/grid_folders.dart';
 import 'package:saber/components/home/home_layout_button.dart';
 import 'package:saber/components/home/masonry_files.dart';
@@ -17,8 +18,10 @@ import 'package:saber/components/home/path_components.dart';
 import 'package:saber/components/home/rename_note_button.dart';
 import 'package:saber/components/home/sort_button.dart';
 import 'package:saber/components/home/syncing_button.dart';
+import 'package:saber/components/home/unlock_folder_screen.dart';
 import 'package:saber/components/theming/saber_theme.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
+import 'package:saber/data/folder_lock/folder_lock_service.dart';
 import 'package:saber/data/prefs.dart';
 import 'package:saber/data/routes.dart';
 import 'package:saber/i18n/strings.g.dart';
@@ -42,6 +45,14 @@ class _BrowsePageState extends State<BrowsePage> {
 
   final ValueNotifier<List<String>> selectedFiles = ValueNotifier([]);
 
+  FolderLockService? _folderLockService;
+
+  /// Null while the lock is being resolved, so contents are never built
+  /// before the answer is known (FR-10, FR-23).
+  bool? _contentsMayBeShown;
+
+  var _lockCheck = 0;
+
   @override
   void initState() {
     path = widget.initialPath;
@@ -53,6 +64,13 @@ class _BrowsePageState extends State<BrowsePage> {
     selectedFiles.addListener(_setState);
 
     super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _folderLockService = FolderLockScope.of(context);
+    _checkLock();
   }
 
   @override
@@ -69,6 +87,33 @@ class _BrowsePageState extends State<BrowsePage> {
   }
 
   void _setState() => setState(() {});
+
+  /// Asks the service whether the current folder may be shown.
+  ///
+  /// The last check wins, so a slow answer for an old path cannot overwrite a
+  /// newer one. While the answer is unknown nothing is rendered.
+  Future<void> _checkLock() async {
+    final check = ++_lockCheck;
+    final mayBeShown = await _folderLockService!.isOpen(path ?? '/');
+    if (!mounted || check != _lockCheck) return;
+    if (_contentsMayBeShown != mayBeShown) {
+      setState(() => _contentsMayBeShown = mayBeShown);
+    }
+  }
+
+  /// Resolves the lock before moving, so the new folder is either shown or
+  /// gated — never flashed and then hidden.
+  Future<void> _goTo(String? newPath) async {
+    final mayBeShown = await _folderLockService!.isOpen(newPath ?? '/');
+    if (!mounted) return;
+
+    setState(() {
+      path = newPath;
+      _contentsMayBeShown = mayBeShown;
+    });
+    context.go(HomeRoutes.browseFilePath(newPath ?? '/'));
+    findChildrenOfPath();
+  }
 
   Future findChildrenOfPath({bool fromFileListener = false}) async {
     if (!mounted) return;
@@ -92,13 +137,11 @@ class _BrowsePageState extends State<BrowsePage> {
   void onDirectoryTap(String folder) {
     selectedFiles.value = [];
     if (folder == '..') {
-      path = p.dirname(path ?? '/');
-      if (path == '/') path = null;
+      final parent = p.dirname(path ?? '/');
+      _goTo(parent == '/' ? null : parent);
     } else {
-      path = p.join(path ?? '/', folder);
+      _goTo(p.join(path ?? '/', folder));
     }
-    context.go(HomeRoutes.browseFilePath(path ?? '/'));
-    findChildrenOfPath();
   }
 
   void onPathComponentTap(String? newPath) {
@@ -106,9 +149,7 @@ class _BrowsePageState extends State<BrowsePage> {
     if (newPath == null || newPath.isEmpty || newPath == '/') {
       newPath = null;
     }
-    path = newPath;
-    context.go(HomeRoutes.browseFilePath(path ?? '/'));
-    findChildrenOfPath();
+    _goTo(newPath);
   }
 
   Future<void> createFolder(String folderName) async {
@@ -124,6 +165,19 @@ class _BrowsePageState extends State<BrowsePage> {
     final crossAxisCount = MediaQuery.sizeOf(context).width ~/ 300 + 1;
     useListenable(stows.homeLayout);
     useOnListenableChange(stows.browseSortMetric, findChildrenOfPath);
+
+    if (_contentsMayBeShown != true) {
+      return Scaffold(
+        body: _contentsMayBeShown == false
+            ? UnlockFolderScreen(
+                folderPath: path ?? '/',
+                onUnlocked: (_) => _checkLock(),
+              )
+            // Resolving the lock; rendering nothing here is what keeps a
+            // locked folder's contents out of the tree entirely.
+            : const SizedBox.shrink(),
+      );
+    }
 
     return Scaffold(
       body: CustomScrollView(
@@ -157,6 +211,7 @@ class _BrowsePageState extends State<BrowsePage> {
           GridFolders(
             isAtRoot: path?.isEmpty ?? true,
             crossAxisCount: crossAxisCount,
+            parentPath: path,
             onTap: onDirectoryTap,
             createFolder: createFolder,
             doesFolderExist: (String folderName) {
@@ -164,7 +219,11 @@ class _BrowsePageState extends State<BrowsePage> {
             },
             renameFolder: (String oldName, String newName) async {
               final oldPath = '${path ?? ''}/$oldName';
-              await FileManager.renameDirectory(oldPath, newName);
+              final newPath = await FileManager.renameDirectory(
+                oldPath,
+                newName,
+              );
+              _folderLockService?.folderMoved(from: oldPath, to: newPath);
               findChildrenOfPath();
             },
             isFolderEmpty: (String folderName) async {

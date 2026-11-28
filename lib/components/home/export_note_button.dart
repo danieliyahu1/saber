@@ -4,6 +4,8 @@ import 'package:archive/archive_io.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
+import 'package:saber/components/home/folder_unlock_dialog.dart';
 import 'package:saber/components/theming/adaptive_circular_progress_indicator.dart';
 import 'package:saber/data/editor/editor_core_info.dart';
 import 'package:saber/data/editor/editor_exporter.dart';
@@ -26,53 +28,68 @@ class _ExportNoteButtonState extends State<ExportNoteButton> {
   Future exportFile(List<String> selectedFiles, bool exportPdf) async {
     setState(() => _currentlyExporting = true);
 
-    final files = <ArchiveFile>[];
-    for (final filePath in selectedFiles) {
-      final coreInfo = await EditorCoreInfo.loadFromFilePath(filePath);
-      if (!mounted) break;
+    try {
+      // Exporting reads the whole note, so a note in a locked folder asks for
+      // its password first — no export without it (PRD FR-17, NFR-6).
+      for (final filePath in selectedFiles) {
+        if (!await FolderUnlockDialog.ensureOpen(context, filePath)) return;
+        if (!mounted) return;
+      }
 
-      final fileNameWithoutExtension = coreInfo.filePath.substring(
-        coreInfo.filePath.lastIndexOf('/') + 1,
-      );
+      final files = <ArchiveFile>[];
+      for (final filePath in selectedFiles) {
+        final coreInfo = await EditorCoreInfo.loadFromFilePath(filePath);
+        if (!mounted) break;
 
-      if (exportPdf) {
-        final pdfDoc = await EditorExporter.generatePdf(coreInfo, context);
-        final pdfBytes = await pdfDoc.save();
-        files.add(
-          ArchiveFile(
-            '$fileNameWithoutExtension.pdf',
-            pdfBytes.length,
-            pdfBytes,
+        final fileNameWithoutExtension = coreInfo.filePath.substring(
+          coreInfo.filePath.lastIndexOf('/') + 1,
+        );
+
+        if (exportPdf) {
+          final pdfDoc = await EditorExporter.generatePdf(coreInfo, context);
+          final pdfBytes = await pdfDoc.save();
+          files.add(
+            ArchiveFile(
+              '$fileNameWithoutExtension.pdf',
+              pdfBytes.length,
+              pdfBytes,
+            ),
+          );
+        } else {
+          final sba = await coreInfo.saveToSba(currentPageIndex: null);
+          files.add(
+            ArchiveFile('$fileNameWithoutExtension.sba', sba.length, sba),
+          );
+        }
+      }
+
+      if (!mounted) return;
+      if (selectedFiles.length == 1) {
+        await FolderLockScope.runSystemFlow(
+          context,
+          () => FileManager.exportFile(
+            files.single.name,
+            files.single.content,
+            context: context,
           ),
         );
-      } else {
-        final sba = await coreInfo.saveToSba(currentPageIndex: null);
-        files.add(
-          ArchiveFile('$fileNameWithoutExtension.sba', sba.length, sba),
+      } else if (selectedFiles.length > 1) {
+        final archive = Archive();
+        for (final archiveFile in files) {
+          archive.addFile(archiveFile);
+        }
+        await FolderLockScope.runSystemFlow(
+          context,
+          () => FileManager.exportFile(
+            '${files.first.name}.zip',
+            Uint8List.fromList(ZipEncoder().encode(archive)),
+            context: context,
+          ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _currentlyExporting = false);
     }
-
-    if (!mounted) return;
-    if (selectedFiles.length == 1) {
-      await FileManager.exportFile(
-        files.single.name,
-        files.single.content,
-        context: context,
-      );
-    } else if (selectedFiles.length > 1) {
-      final archive = Archive();
-      for (final archiveFile in files) {
-        archive.addFile(archiveFile);
-      }
-      await FileManager.exportFile(
-        '${files.first.name}.zip',
-        Uint8List.fromList(ZipEncoder().encode(archive)),
-        context: context,
-      );
-    }
-
-    setState(() => _currentlyExporting = false);
   }
 
   @override

@@ -1,5 +1,7 @@
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
+import 'package:saber/components/home/folder_unlock_dialog.dart';
 import 'package:saber/components/home/grid_folders.dart';
 import 'package:saber/components/theming/adaptive_alert_dialog.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
@@ -11,23 +13,39 @@ class MoveNoteButton extends StatelessWidget {
     super.key,
     required this.filesToMove,
     required this.unselectNotes,
+    this.childrenOf,
   });
 
   final List<String> filesToMove;
   final void Function() unselectNotes;
+
+  /// Lists a folder's children for the picker.
+  ///
+  /// Real directory reads do not complete inside a widget test's clock, so
+  /// tests pass their own listing. Production uses [FileManager].
+  @visibleForTesting
+  final Future<DirectoryChildren?> Function(String folder)? childrenOf;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       padding: .zero,
       tooltip: t.home.moveNote.moveNote,
-      onPressed: () {
+      onPressed: () async {
+        // Moving a locked note out of its folder exposes it (PRD NFR-6), and
+        // the dialog lists folder names, so open the notes' folder first.
+        for (final filePath in filesToMove) {
+          if (!await FolderUnlockDialog.ensureOpen(context, filePath)) return;
+        }
+        if (!context.mounted) return;
+
         showDialog(
           context: context,
           builder: (BuildContext context) {
             return _MoveNoteDialog(
               filesToMove: filesToMove,
               unselectNotes: unselectNotes,
+              childrenOf: childrenOf ?? FileManager.getChildrenOfDirectory,
             );
           },
         );
@@ -38,10 +56,15 @@ class MoveNoteButton extends StatelessWidget {
 }
 
 class _MoveNoteDialog extends StatefulWidget {
-  const new({required this.filesToMove, required this.unselectNotes});
+  const new({
+    required this.filesToMove,
+    required this.unselectNotes,
+    required this.childrenOf,
+  });
 
   final List<String> filesToMove;
   final void Function() unselectNotes;
+  final Future<DirectoryChildren?> Function(String folder) childrenOf;
 
   @override
   State<_MoveNoteDialog> createState() => _MoveNoteDialogState();
@@ -97,9 +120,7 @@ class _MoveNoteDialogState extends State<_MoveNoteDialog> {
   late List<String> changedFileNames = [];
 
   Future findChildrenOfCurrentFolder() async {
-    currentFolderChildren = await FileManager.getChildrenOfDirectory(
-      currentFolder,
-    );
+    currentFolderChildren = await widget.childrenOf(currentFolder);
 
     newFileNames = [];
     changedFileNames = [];
@@ -172,9 +193,10 @@ class _MoveNoteDialogState extends State<_MoveNoteDialog> {
                   GridFolders(
                     isAtRoot: currentFolder == '/',
                     crossAxisCount: 3,
-                    onTap: (String folder) {
-                      setState(() {
-                        if (folder == '..') {
+                    parentPath: currentFolder,
+                    onTap: (String folder) async {
+                      if (folder == '..') {
+                        setState(() {
                           currentFolder = currentFolder.substring(
                             0,
                             currentFolder.lastIndexOf(
@@ -183,10 +205,21 @@ class _MoveNoteDialogState extends State<_MoveNoteDialog> {
                                 ) +
                                 1,
                           );
-                        } else {
-                          currentFolder = '$currentFolder$folder/';
-                        }
-                      });
+                        });
+                        return;
+                      }
+
+                      final target = '$currentFolder$folder/';
+                      // A locked folder shows its password screen instead of
+                      // its contents, the picker included (PRD FR-10).
+                      if (!await FolderUnlockDialog.ensureOpen(
+                        context,
+                        target,
+                      )) {
+                        return;
+                      }
+                      if (!mounted) return;
+                      setState(() => currentFolder = target);
                     },
                     createFolder: createFolder,
                     doesFolderExist: (String folderName) {
@@ -196,8 +229,13 @@ class _MoveNoteDialogState extends State<_MoveNoteDialog> {
                           false;
                     },
                     renameFolder: (String oldName, String newName) async {
+                      final lockService = FolderLockScope.maybeOf(context);
                       final oldPath = '$currentFolder$oldName';
-                      await FileManager.renameDirectory(oldPath, newName);
+                      final newPath = await FileManager.renameDirectory(
+                        oldPath,
+                        newName,
+                      );
+                      lockService?.folderMoved(from: oldPath, to: newPath);
                       findChildrenOfCurrentFolder();
                     },
                     isFolderEmpty: (String folderName) async {
@@ -242,6 +280,15 @@ class _MoveNoteDialogState extends State<_MoveNoteDialog> {
         ),
         CupertinoDialogAction(
           onPressed: () async {
+            // The session can close while this dialog is open (PRD FR-28), so
+            // the sources are checked again right before they move.
+            for (final filePath in widget.filesToMove) {
+              if (!await FolderUnlockDialog.ensureOpen(context, filePath)) {
+                return;
+              }
+            }
+            if (!mounted) return;
+
             for (int i = 0; i < widget.filesToMove.length; ++i) {
               final extension = oldExtensions[i]
                   ? Editor.extensionOldJson

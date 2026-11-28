@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:saber/components/home/folder_lock_scope.dart';
 import 'package:saber/components/navbar/bottom_navbar.dart';
 import 'package:saber/components/theming/saber_theme.dart';
 import 'package:saber/data/file_manager/file_manager.dart';
@@ -79,7 +80,10 @@ class _NewNoteButtonState extends State<NewNoteButton> {
           child: const Icon(Icons.note_add),
           label: t.home.create.importNote,
           onTap: () async {
-            final file = await FilePicker.pickFile(type: FileType.any);
+            final file = await FolderLockScope.runSystemFlow(
+              context,
+              () => FilePicker.pickFile(type: FileType.any),
+            );
             if (file == null) return;
 
             final filePath = file.path;
